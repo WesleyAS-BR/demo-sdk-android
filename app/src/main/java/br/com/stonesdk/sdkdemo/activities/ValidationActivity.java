@@ -50,8 +50,8 @@ public class ValidationActivity extends AppCompatActivity implements View.OnClic
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_validation);
         initiateAppWithPermissionCheck(this);
-
         Stone.setEnvironment(SANDBOX);
+        Stone.setAppName("DEMO APP"); // Setando o nome do APP (obrigatorio)
         findViewById(R.id.activateButton).setOnClickListener(this);
         stoneCodeEditText = findViewById(R.id.stoneCodeEditText);
         Spinner environmentSpinner = findViewById(R.id.environmentSpinner);

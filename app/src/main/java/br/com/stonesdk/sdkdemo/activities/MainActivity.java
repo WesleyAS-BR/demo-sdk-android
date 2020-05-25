@@ -7,15 +7,17 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.Toast;
 
+import java.util.List;
+
+import br.com.stone.posandroid.providers.PosValidateTransactionByCardProvider;
 import br.com.stonesdk.sdkdemo.R;
+import stone.application.enums.Action;
+import stone.application.interfaces.StoneActionCallback;
 import stone.application.interfaces.StoneCallbackInterface;
+import stone.database.transaction.TransactionObject;
 import stone.providers.ActiveApplicationProvider;
 import stone.providers.DisplayMessageProvider;
 import stone.providers.ReversalProvider;
@@ -24,41 +26,34 @@ import stone.utils.Stone;
 import static android.widget.Toast.LENGTH_SHORT;
 import static android.widget.Toast.makeText;
 
-public class MainActivity extends AppCompatActivity implements OnItemClickListener {
-
-    ListView listView;
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        listView = findViewById(R.id.listMainActivity);
-
-        String[] options = new String[]{
-                "Dispositivos pareados",
-                "Fazer uma transação",
-                "Listar transações",
-                "Mostrar Mensagem no pinpad",
-                "Cancelar transações com erro",
-                "Desativar",
-                "Desconectar com um pinpad"
-        };
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, android.R.id.text1, options);
-        listView.setAdapter(adapter);
-        listView.setOnItemClickListener(this);
+        findViewById(R.id.transactionOption).setOnClickListener(this);
+        findViewById(R.id.posTransactionOption).setOnClickListener(this);
+        findViewById(R.id.pairedDevicesOption).setOnClickListener(this);
+        findViewById(R.id.disconnectDeviceOption).setOnClickListener(this);
+        findViewById(R.id.deactivateOption).setOnClickListener(this);
+        findViewById(R.id.cancelTransactionsOption).setOnClickListener(this);
+        findViewById(R.id.displayMessageOption).setOnClickListener(this);
+        findViewById(R.id.listTransactionOption).setOnClickListener(this);
+        findViewById(R.id.manageStoneCodeOption).setOnClickListener(this);
+        findViewById(R.id.posValidateCardOption).setOnClickListener(this);
     }
 
     @Override
-    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-
+    public void onClick(View v) {
         // Para cada nova opção na lista, um novo "case" precisa ser inserido aqui.
-        switch (position) {
-            case 0:
+        switch (v.getId()) {
+
+            case R.id.pairedDevicesOption:
                 Intent devicesIntent = new Intent(MainActivity.this, DevicesActivity.class);
                 startActivity(devicesIntent);
                 break;
-            case 1:
+
+            case R.id.transactionOption:
                 // Verifica se o bluetooth esta ligado e se existe algum pinpad conectado.
                 if (Stone.getPinpadListSize() > 0) {
                     Intent transactionIntent = new Intent(MainActivity.this, TransactionActivity.class);
@@ -68,11 +63,13 @@ public class MainActivity extends AppCompatActivity implements OnItemClickListen
                     makeText(getApplicationContext(), "Conecte-se a um pinpad.", LENGTH_SHORT).show();
                     break;
                 }
-            case 2:
+
+            case R.id.listTransactionOption:
                 Intent transactionListIntent = new Intent(MainActivity.this, TransactionListActivity.class);
                 startActivity(transactionListIntent);
                 break;
-            case 3:
+
+            case R.id.displayMessageOption:
                 if (Stone.getPinpadListSize() <= 0) {
                     makeText(getApplicationContext(), "Conecte-se a um pinpad.", LENGTH_SHORT).show();
                     break;
@@ -100,7 +97,8 @@ public class MainActivity extends AppCompatActivity implements OnItemClickListen
 
                 builder.show();
                 break;
-            case 4:
+
+            case R.id.cancelTransactionsOption:
                 final ReversalProvider reversalProvider = new ReversalProvider(this);
                 reversalProvider.useDefaultUI(true);
                 reversalProvider.setDialogMessage("Cancelando transações com erro");
@@ -117,7 +115,8 @@ public class MainActivity extends AppCompatActivity implements OnItemClickListen
                 });
                 reversalProvider.execute();
                 break;
-            case 5:
+
+            case R.id.deactivateOption:
                 final ActiveApplicationProvider provider = new ActiveApplicationProvider(MainActivity.this);
                 provider.setDialogMessage("Desativando o aplicativo...");
                 provider.setDialogTitle("Aguarde");
@@ -134,11 +133,13 @@ public class MainActivity extends AppCompatActivity implements OnItemClickListen
                     public void onError() {
                         makeText(MainActivity.this, "Erro na ativacao do aplicativo, verifique a lista de erros do provider", LENGTH_SHORT).show();
                         /* Chame o metodo abaixo para verificar a lista de erros. Para mais detalhes, leia a documentacao: */
-                        Log.e("MainActivity", "onError: " + provider.getListOfErrors().toString());
+                        Log.e("deactivateOption", "onError: " + provider.getListOfErrors().toString());
                     }
                 });
                 provider.deactivate();
-            case 6:
+                break;
+
+            case R.id.disconnectDeviceOption:
                 if (Stone.getPinpadListSize() > 0) {
                     Intent closeBluetoothConnectionIntent = new Intent(MainActivity.this, DisconnectPinpadActivity.class);
                     startActivity(closeBluetoothConnectionIntent);
@@ -146,8 +147,61 @@ public class MainActivity extends AppCompatActivity implements OnItemClickListen
                     Toast.makeText(this, "Nenhum device Conectado", Toast.LENGTH_SHORT).show();
                 }
                 break;
+
+            case R.id.posTransactionOption:
+                startActivity(new Intent(MainActivity.this, PosTransactionActivity.class));
+                break;
+
+            case R.id.manageStoneCodeOption:
+                startActivity(new Intent(MainActivity.this, ManageStoneCodeActivity.class));
+                break;
+
+            case R.id.posValidateCardOption:
+                final PosValidateTransactionByCardProvider posValidateTransactionByCardProvider = new PosValidateTransactionByCardProvider(this);
+                posValidateTransactionByCardProvider.setConnectionCallback(new StoneActionCallback() {
+                    @Override
+                    public void onStatusChanged(final Action action) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, action.name(), Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onSuccess() {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                final List<TransactionObject> transactionsWithCurrentCard = posValidateTransactionByCardProvider.getTransactionsWithCurrentCard();
+                                if (transactionsWithCurrentCard.isEmpty())
+                                    Toast.makeText(MainActivity.this, "Cartão não fez transação.", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(MainActivity.this, "Success", Toast.LENGTH_SHORT).show();
+                                Log.i("posValidateCardOption", "onSuccess: " + transactionsWithCurrentCard);
+                            }
+                        });
+
+                    }
+
+                    @Override
+                    public void onError() {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "Error", Toast.LENGTH_SHORT).show();
+                                Log.e("posValidateCardOption", "onError: " + posValidateTransactionByCardProvider.getListOfErrors());
+                            }
+                        });
+                    }
+
+                });
+                posValidateTransactionByCardProvider.execute();
+                break;
+
             default:
                 break;
         }
     }
+
 }
